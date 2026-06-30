@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentlens"
+version = "0.1.0"
+description = "Observability + eval harness for AI agents. Trace every LLM/tool call, assert behavior, inspect runs locally, export to OpenTelemetry."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "AgentLens contributors" }]
+keywords = [
+    "ai", "agents", "observability", "evals", "tracing", "llm",
+    "opentelemetry", "otel", "aws", "bedrock", "agentcore",
+    "strands", "langgraph", "openai-agents", "groq",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Monitoring",
+    "Typing :: Typed",
+]
+dependencies = []
+
+[project.optional-dependencies]
+viewer = ["fastapi", "uvicorn"]
+langgraph = ["langchain-core"]
+openai-agents = ["openai-agents"]
+otlp = ["opentelemetry-sdk", "opentelemetry-exporter-otlp-proto-grpc"]
+dev = ["pytest", "fastapi", "uvicorn", "build", "twine"]
+
+[project.urls]
+Homepage = "https://github.com/EeswaraReddy/agentlens"
+Repository = "https://github.com/EeswaraReddy/agentlens"
+Issues = "https://github.com/EeswaraReddy/agentlens/issues"
+Changelog = "https://github.com/EeswaraReddy/agentlens/blob/main/CHANGELOG.md"
+
+[project.scripts]
+agentlens = "agentlens.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["agentlens*"]
+exclude = ["tests*", "examples*", "docs*", "runs*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
