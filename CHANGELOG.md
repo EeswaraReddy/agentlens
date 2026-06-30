@@ -3,6 +3,29 @@
 All notable changes to AgentLens are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] — 2026-06-30
+
+Production release: REST API server, enterprise dashboard UI, Docker.
+
+### Added
+- **Production server** (`agentlens.server`) — FastAPI + SQLAlchemy with
+  SQLite by default and Postgres-ready. Endpoints under `/api/v1`:
+  `POST /traces`, `GET /traces`, `GET /traces/{id}`, `GET /stats`,
+  `GET /project`, `GET /health`.
+- **API-key auth** with multi-project isolation; default project auto-created
+  on first start.
+- **Enterprise dashboard UI** at `/` — sidebar layout, traces list with
+  search/filter/pagination, span waterfall detail view, 14-day stats with
+  Chart.js charts (traces per day, top LLM models by cost), settings page
+  with copy-able install snippet.
+- **`Tracer.export_to(url, api_key)`** — stdlib-only client that ships
+  traces to a running server.
+- **`agentlens server`** CLI to launch the production app.
+- **Docker** — `Dockerfile` (multi-arch slim base) and `docker-compose.yml`
+  with persistent volume and optional Postgres service.
+- 8 new integration tests (33 total) covering ingest, list, filter, search,
+  detail, stats, idempotency, auth.
+
 ## [0.1.0] — 2026-06-30
 
 Initial release.

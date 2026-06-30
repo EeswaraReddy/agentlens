@@ -12,6 +12,20 @@ import os
 import sys
 
 
+def _cmd_server(args: argparse.Namespace) -> int:
+    try:
+        import uvicorn
+    except ImportError:
+        print('Install server extras first:  pip install "agentlens[server]"')
+        return 1
+    print(f"AgentLens server  →  http://{args.host}:{args.port}")
+    print("Default project + API key will be created on first run.")
+    print('Set AGENTLENS_DATABASE_URL=postgres://... for a real database.\n')
+    uvicorn.run("agentlens.server.app:app", host=args.host, port=args.port,
+                reload=args.reload, log_level="info")
+    return 0
+
+
 def _cmd_view(args: argparse.Namespace) -> int:
     from .viewer import serve
     serve(directory=args.dir, port=args.port)
@@ -41,10 +55,16 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="agentlens", description="Observability + evals for AI agents")
     sub = parser.add_subparsers(dest="command")
 
-    p_view = sub.add_parser("view", help="Launch the local trace viewer")
+    p_view = sub.add_parser("view", help="Launch the legacy local trace viewer (file-based)")
     p_view.add_argument("--dir", default="runs", help="Directory of trace JSON files")
     p_view.add_argument("--port", type=int, default=8800)
     p_view.set_defaults(func=_cmd_view)
+
+    p_serv = sub.add_parser("server", help="Run the production server (REST API + UI)")
+    p_serv.add_argument("--host", default="127.0.0.1")
+    p_serv.add_argument("--port", type=int, default=8800)
+    p_serv.add_argument("--reload", action="store_true", help="autoreload (dev)")
+    p_serv.set_defaults(func=_cmd_server)
 
     p_ls = sub.add_parser("ls", help="List saved traces")
     p_ls.add_argument("--dir", default="runs")

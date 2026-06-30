@@ -1,30 +1,83 @@
 # AgentLens
 
-Observability + eval harness for AI agents. Trace every LLM and tool call,
-assert behavior with declarative evals, and inspect runs in a local web viewer.
+Production observability + eval control plane for AI agents. Trace every LLM
+and tool call, assert behavior with declarative evals, ship traces to a
+multi-tenant server with a REST API and an enterprise dashboard, or export
+straight to OpenTelemetry.
 
 Most AI agent projects don't fail on prompts or models — they fail on the
-**ops layer**: no tracing, no evals, no guardrails. AgentLens is that layer, in
-a dependency-free core that runs anywhere and exports to OpenTelemetry or
-Amazon Bedrock AgentCore.
+**ops layer**: no tracing, no evals, no guardrails. AgentLens is that layer.
 
 ```
-   instrument            assert                 inspect
-   ──────────            ──────                 ───────
-   tracer.llm(...)   →   evals.max_cost(0.01)   →   agentlens view
-   tracer.tool(...)      evals.called_tool(...)
+   instrument            assert                  ship & view
+   ──────────            ──────                  ───────────
+   tracer.llm(...)   →   evals.max_cost(0.01)    →   agentlens server
+   tracer.tool(...)      evals.called_tool(...)      OTLP / AgentCore
 ```
 
 ## Why it exists
 
-- **Observability is table stakes.** You can't fix what you can't see. Every
-  LLM and tool call becomes a structured span with timing, tokens, and cost.
-- **Eval-first.** Encode the behavior you require ("never refund", "look up the
-  order before replying", "stay under $0.01") and fail loudly on drift.
-- **Zero cloud to try.** The core has no dependencies. Run the example, see
-  traces, run evals — no API keys.
+- **Production-grade backend.** FastAPI + SQLAlchemy server with API-key auth,
+  multi-project isolation, pagination, indexes, stats, and a dashboard.
+- **Observability is table stakes.** Every LLM and tool call becomes a
+  structured span with timing, tokens, and cost.
+- **Eval-first.** Encode the behavior you require and fail loudly on drift.
+- **Zero cloud to try.** SQLite by default; Postgres when you need it.
+- **Open by design.** OpenTelemetry export to Tempo, Jaeger, X-Ray, AgentCore.
 
-## Install
+## Quickstart — production server (60 seconds)
+
+```bash
+pip install "agentlens[server]"
+agentlens server                              # http://localhost:8800
+```
+
+On first launch the server creates a `default` project with an API key.
+Open http://localhost:8800 — the dashboard prompts for the key.
+
+Ship a trace from any agent:
+
+```python
+from agentlens import Tracer
+
+tracer = Tracer()
+with tracer.trace("support-agent", user="alice"):
+    with tracer.llm("classify", model="gpt-4o-mini") as s:
+        s.record_tokens(prompt=120, completion=18, model="gpt-4o-mini")
+        s.set_output(intent="order_status")
+    with tracer.tool("lookup_order", order_id="A1029") as s:
+        s.set_output(status="shipped")
+
+tracer.export_to("http://localhost:8800", api_key="al_...")
+```
+
+The trace shows up in the dashboard within seconds, with cost, tokens, span
+waterfall, status, and search.
+
+## Server API
+
+All endpoints require `X-API-Key`. Versioned under `/api/v1`.
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/traces` | Ingest a trace |
+| `GET`  | `/traces` | List traces (`q`, `status`, `page`, `page_size`) |
+| `GET`  | `/traces/{id}` | Full trace + spans |
+| `GET`  | `/stats` | Aggregate stats for a project (`?days=14`) |
+| `GET`  | `/project` | Current project info |
+| `GET`  | `/health` | Liveness |
+
+## Deploy with Docker
+
+```bash
+docker compose up -d
+# http://localhost:8800
+```
+
+Switch to Postgres by uncommenting the `db` service in `docker-compose.yml`
+and setting `AGENTLENS_DATABASE_URL=postgresql+psycopg2://...`.
+
+## Install (library only, no server)
 
 ```bash
 # core only (no dependencies)

@@ -189,3 +189,34 @@ class Tracer:
                 json.dump(tr.to_dict(), f, indent=2)
             paths.append(path)
         return paths
+
+    # ---- remote shipping ------------------------------------------------
+    def export_to(self, url: str, api_key: str, timeout: float = 10.0) -> List[str]:
+        """Ship every finished trace to a running AgentLens server.
+
+        Uses stdlib only so this stays dependency-free. Returns the list of
+        trace_ids the server confirmed.
+
+            tracer.export_to("http://localhost:8800", api_key="al_...")
+        """
+        import urllib.error
+        import urllib.request
+
+        endpoint = url.rstrip("/") + "/api/v1/traces"
+        confirmed: List[str] = []
+        for tr in self.finished:
+            payload = json.dumps({"trace": tr.to_dict()}).encode("utf-8")
+            req = urllib.request.Request(
+                endpoint, data=payload, method="POST",
+                headers={"Content-Type": "application/json", "X-API-Key": api_key},
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    body = json.loads(resp.read().decode("utf-8"))
+                    confirmed.append(body.get("trace_id", tr.trace_id))
+            except urllib.error.HTTPError as exc:
+                msg = exc.read().decode("utf-8", "replace")
+                raise RuntimeError(f"export_to: HTTP {exc.code}: {msg}") from exc
+            except urllib.error.URLError as exc:
+                raise RuntimeError(f"export_to: {exc.reason}") from exc
+        return confirmed

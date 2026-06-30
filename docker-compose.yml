@@ -1,0 +1,31 @@
+services:
+  agentlens:
+    build: .
+    image: agentlens:0.2.0
+    container_name: agentlens
+    restart: unless-stopped
+    ports:
+      - "8800:8800"
+    environment:
+      AGENTLENS_DATABASE_URL: ${AGENTLENS_DATABASE_URL:-sqlite:////data/agentlens.db}
+    volumes:
+      - agentlens-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8800/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+# Uncomment for Postgres:
+#  db:
+#    image: postgres:16-alpine
+#    environment:
+#      POSTGRES_USER: agentlens
+#      POSTGRES_PASSWORD: agentlens
+#      POSTGRES_DB: agentlens
+#    volumes:
+#      - pg-data:/var/lib/postgresql/data
+
+volumes:
+  agentlens-data:
+#  pg-data:

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentlens"
-version = "0.1.0"
-description = "Observability + eval harness for AI agents. Trace every LLM/tool call, assert behavior, inspect runs locally, export to OpenTelemetry."
+version = "0.2.0"
+description = "Production observability + evals control plane for AI agents — REST API, web dashboard, traces, evals, OpenTelemetry export."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
@@ -34,10 +34,12 @@ dependencies = []
 
 [project.optional-dependencies]
 viewer = ["fastapi", "uvicorn"]
+server = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "sqlalchemy>=2.0", "pydantic>=2"]
 langgraph = ["langchain-core"]
 openai-agents = ["openai-agents"]
 otlp = ["opentelemetry-sdk", "opentelemetry-exporter-otlp-proto-grpc"]
-dev = ["pytest", "fastapi", "uvicorn", "build", "twine"]
+postgres = ["psycopg2-binary"]
+dev = ["pytest", "fastapi", "uvicorn", "sqlalchemy", "httpx", "build", "twine"]
 
 [project.urls]
 Homepage = "https://github.com/EeswaraReddy/agentlens"
@@ -51,6 +53,9 @@ agentlens = "agentlens.cli:main"
 [tool.setuptools.packages.find]
 include = ["agentlens*"]
 exclude = ["tests*", "examples*", "docs*", "runs*"]
+
+[tool.setuptools.package-data]
+"agentlens.server" = ["ui/*.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

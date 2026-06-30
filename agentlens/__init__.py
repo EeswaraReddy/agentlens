@@ -12,6 +12,6 @@ from . import evals
 from . import pricing
 from . import export
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = ["Tracer", "Trace", "Span", "evals", "pricing", "export", "__version__"]

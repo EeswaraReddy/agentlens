@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AgentLens · Control plane for AI agents</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><text y=%2226%22 font-size=%2226%22>🔍</text></svg>" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:#0a0d14; --bg-2:#0e1320; --panel:#121826; --panel-2:#171f31;
+    --border:#1e2740; --border-2:#2a3556;
+    --text:#e6ebf5; --text-2:#a4b0c8; --muted:#6b7896;
+    --accent:#5ec2ff; --accent-2:#7d6aff;
+    --ok:#3fd28b; --warn:#ffb86c; --err:#ff6b8a;
+    --llm:#bd93f9; --tool:#ffb86c; --agent:#5ec2ff; --event:#6b7896;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    font-size:13px;line-height:1.5;display:flex;overflow:hidden}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:4px}
+  a{color:var(--accent);text-decoration:none}
+
+  /* ─── sidebar ─── */
+  .side{width:240px;background:var(--bg-2);border-right:1px solid var(--border);
+    display:flex;flex-direction:column;flex-shrink:0}
+  .brand{padding:18px 20px;border-bottom:1px solid var(--border);
+    display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;letter-spacing:.3px}
+  .brand .dot{width:10px;height:10px;background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    border-radius:50%;box-shadow:0 0 12px rgba(94,194,255,.45)}
+  .nav{padding:14px 10px;flex:1}
+  .nav a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;
+    color:var(--text-2);font-weight:500}
+  .nav a:hover{background:var(--panel);color:var(--text)}
+  .nav a.active{background:var(--panel-2);color:var(--text)}
+  .nav a svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8}
+  .side-foot{padding:14px 20px;border-top:1px solid var(--border);color:var(--muted);font-size:11px}
+  .side-foot b{color:var(--text-2)}
+
+  /* ─── header ─── */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0}
+  .header{height:54px;border-bottom:1px solid var(--border);
+    display:flex;align-items:center;padding:0 24px;gap:16px;background:var(--bg)}
+  .header h2{font-size:14px;font-weight:600;color:var(--text)}
+  .pill{padding:3px 10px;border-radius:99px;background:var(--panel);border:1px solid var(--border);
+    color:var(--text-2);font-size:11px}
+  .pill.ok{color:var(--ok);border-color:rgba(63,210,139,.3)}
+  .grow{flex:1}
+  .search{background:var(--panel);border:1px solid var(--border);color:var(--text);
+    padding:7px 12px;border-radius:8px;font-size:12px;width:260px;outline:none}
+  .search:focus{border-color:var(--accent)}
+  .select{background:var(--panel);border:1px solid var(--border);color:var(--text);
+    padding:7px 10px;border-radius:8px;font-size:12px;outline:none}
+
+  /* ─── content ─── */
+  .view{flex:1;overflow-y:auto;padding:24px}
+  .view-hidden{display:none}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+  .card .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+  .card .v{font-size:22px;font-weight:700;margin-top:6px}
+  .card .v small{font-size:13px;font-weight:500;color:var(--text-2)}
+  .card .sub{font-size:11px;color:var(--muted);margin-top:4px}
+
+  /* table */
+  .table-wrap{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{text-align:left;padding:12px 14px;background:var(--bg-2);
+    color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+  td{padding:12px 14px;border-top:1px solid var(--border)}
+  tr.row{cursor:pointer;transition:background .15s}
+  tr.row:hover{background:var(--panel-2)}
+  .mono{font-family:ui-monospace,Menlo,"Cascadia Mono",monospace;font-size:11.5px;color:var(--text-2)}
+  .status{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10.5px;font-weight:700;text-transform:uppercase}
+  .status.ok{background:rgba(63,210,139,.12);color:var(--ok)}
+  .status.error{background:rgba(255,107,138,.12);color:var(--err)}
+  .pager{display:flex;align-items:center;gap:10px;padding:14px;color:var(--text-2);font-size:12px}
+  .pager button{background:var(--panel-2);border:1px solid var(--border);color:var(--text);
+    padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px}
+  .pager button:disabled{opacity:.4;cursor:not-allowed}
+
+  /* trace detail */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;
+    align-items:flex-start;justify-content:center;z-index:100;padding:24px;overflow-y:auto}
+  .modal.show{display:flex}
+  .modal .box{background:var(--bg);border:1px solid var(--border);border-radius:14px;
+    width:min(1080px,100%);padding:24px}
+  .modal h3{font-size:16px;margin-bottom:4px}
+  .modal .id{color:var(--muted);font-size:12px;margin-bottom:18px}
+  .close{float:right;background:transparent;border:1px solid var(--border);color:var(--text);
+    border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px}
+  .waterfall{margin-top:16px}
+  .span{padding:10px 14px;margin:6px 0;background:var(--panel);border:1px solid var(--border);border-radius:8px}
+  .span .row1{display:flex;align-items:center;gap:10px}
+  .kind{font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;text-transform:uppercase}
+  .kind.llm{background:rgba(189,147,249,.13);color:var(--llm)}
+  .kind.tool{background:rgba(255,184,108,.13);color:var(--tool)}
+  .kind.agent{background:rgba(94,194,255,.13);color:var(--agent)}
+  .kind.event{background:rgba(107,120,150,.13);color:var(--event)}
+  .span .name{font-weight:600;font-size:13px}
+  .span .dur{color:var(--muted);font-size:11.5px}
+  .span .ml{margin-left:auto;display:flex;gap:14px;align-items:center;color:var(--text-2);font-size:11.5px}
+  .bar{height:3px;background:var(--accent);border-radius:2px;margin-top:8px;opacity:.55}
+  .io{margin-top:8px;font-family:ui-monospace,monospace;font-size:11px;color:var(--muted);
+    white-space:pre-wrap;word-break:break-word;background:var(--bg-2);border-radius:6px;padding:8px 10px}
+
+  /* settings */
+  .field{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:14px}
+  .field h4{margin-bottom:8px;font-size:13px}
+  .field code{background:var(--bg-2);border:1px solid var(--border);padding:2px 7px;border-radius:5px;
+    font-size:12px;color:var(--text)}
+  .field .hint{color:var(--muted);font-size:11.5px;margin-top:6px}
+  .copy-block{display:flex;align-items:center;gap:10px;background:var(--bg-2);border:1px solid var(--border);
+    border-radius:8px;padding:10px 12px;margin-top:10px;font-family:ui-monospace,monospace;font-size:12px}
+  .copy-block button{margin-left:auto;background:var(--panel-2);border:1px solid var(--border);
+    color:var(--text);padding:4px 10px;border-radius:5px;cursor:pointer;font-size:11px}
+  .empty{padding:60px;text-align:center;color:var(--muted)}
+
+  /* charts */
+  .chart-wrap{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:18px;margin-bottom:18px}
+  .chart-wrap h4{font-size:13px;margin-bottom:12px;color:var(--text-2)}
+  .chart-wrap canvas{max-height:240px}
+</style>
+</head>
+<body>
+
+<aside class="side">
+  <div class="brand"><span class="dot"></span> AgentLens</div>
+  <nav class="nav">
+    <a href="#" data-view="traces" class="active">
+      <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h12"/></svg> Traces
+    </a>
+    <a href="#" data-view="stats">
+      <svg viewBox="0 0 24 24"><path d="M3 3v18h18M7 14l4-4 4 4 6-6"/></svg> Stats
+    </a>
+    <a href="#" data-view="settings">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 1-.2 1.6l2 1.5-2 3.4-2.4-.9a7 7 0 0 1-2.7 1.6l-.4 2.5h-4l-.4-2.5a7 7 0 0 1-2.7-1.6l-2.4.9-2-3.4 2-1.5A7 7 0 0 1 5 12a7 7 0 0 1 .2-1.6l-2-1.5 2-3.4 2.4.9a7 7 0 0 1 2.7-1.6L10.7 2h4l.4 2.5a7 7 0 0 1 2.7 1.6l2.4-.9 2 3.4-2 1.5c.1.5.2 1 .2 1.6z"/></svg> Settings
+    </a>
+  </nav>
+  <div class="side-foot">
+    <b>Project:</b> <span id="proj-name">…</span><br/>
+    v<span id="ver">0.2.0</span> · <a href="https://github.com/EeswaraReddy/agentlens" target="_blank" rel="noopener">repo</a>
+  </div>
+</aside>
+
+<main class="main">
+  <header class="header">
+    <h2 id="view-title">Traces</h2>
+    <span class="pill ok" id="conn">● connected</span>
+    <span class="grow"></span>
+    <input id="search" class="search" placeholder="Search traces by name…" />
+    <select id="filter-status" class="select">
+      <option value="">All statuses</option>
+      <option value="ok">OK</option>
+      <option value="error">Errors</option>
+    </select>
+  </header>
+
+  <section class="view" id="view-traces">
+    <div class="cards" id="kpi"></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Status</th><th>Trace</th><th>Spans</th><th>Tokens</th><th>Cost</th><th>Duration</th><th>When</th></tr>
+        </thead>
+        <tbody id="tbody"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+      </table>
+      <div class="pager">
+        <button id="prev">‹ Prev</button>
+        <span id="pageinfo">page 1</span>
+        <button id="next">Next ›</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="view view-hidden" id="view-stats">
+    <div class="cards" id="kpi-stats"></div>
+    <div class="chart-wrap"><h4>Traces per day</h4><canvas id="chart-day"></canvas></div>
+    <div class="chart-wrap"><h4>Top LLM models by cost</h4><canvas id="chart-models"></canvas></div>
+  </section>
+
+  <section class="view view-hidden" id="view-settings">
+    <div class="field">
+      <h4>API key</h4>
+      <p class="hint">Send this in the <code>X-API-Key</code> header from your agent code.</p>
+      <div class="copy-block"><span id="api-key">loading…</span>
+        <button onclick="copyKey()">Copy</button></div>
+    </div>
+    <div class="field">
+      <h4>Instrument your agent</h4>
+      <div class="copy-block" style="display:block;white-space:pre">from agentlens import Tracer
+
+tracer = Tracer()
+with tracer.trace("my-agent"):
+    with tracer.llm("call", model="gpt-4o") as s:
+        s.record_tokens(prompt=200, completion=80, model="gpt-4o")
+        s.set_output(text="hello")
+
+tracer.export_to("<span id="api-url"></span>", api_key="<span id="api-key-2"></span>")</div>
+    </div>
+    <div class="field">
+      <h4>Endpoints</h4>
+      <div class="copy-block">GET  /api/v1/traces</div>
+      <div class="copy-block">GET  /api/v1/traces/{id}</div>
+      <div class="copy-block">POST /api/v1/traces</div>
+      <div class="copy-block">GET  /api/v1/stats</div>
+    </div>
+  </section>
+</main>
+
+<div class="modal" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="box">
+    <button class="close" onclick="closeModal()">Close ✕</button>
+    <h3 id="m-name">Trace</h3>
+    <div class="id mono" id="m-id"></div>
+    <div class="cards" id="m-cards"></div>
+    <div class="waterfall" id="m-spans"></div>
+  </div>
+</div>
+
+<script>
+const API_KEY_KEY = "agentlens.apiKey";
+let apiKey = localStorage.getItem(API_KEY_KEY) || "";
+let page = 1, pageSize = 25, total = 0;
+let chartDay = null, chartModels = null;
+
+async function api(path, opts={}) {
+  const headers = {"Content-Type":"application/json", "X-API-Key": apiKey};
+  const r = await fetch(path, {...opts, headers});
+  if (r.status === 401) { await bootstrapKey(); return api(path, opts); }
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+async function bootstrapKey() {
+  // First-run: the server auto-creates a 'default' project. We don't know its
+  // key from the browser, so prompt once and persist.
+  let k = prompt("Enter your AgentLens API key.\n(See the server console on first launch.)");
+  if (k) { apiKey = k.trim(); localStorage.setItem(API_KEY_KEY, apiKey); }
+}
+
+function fmtCost(n){return "$" + (n||0).toFixed(6)}
+function fmtMs(n){return (n||0).toFixed(0)+" ms"}
+function fmtNum(n){return new Intl.NumberFormat().format(n||0)}
+function timeAgo(iso){
+  const s = (Date.now() - new Date(iso).getTime())/1000;
+  if (s<60) return Math.floor(s)+"s ago";
+  if (s<3600) return Math.floor(s/60)+"m ago";
+  if (s<86400) return Math.floor(s/3600)+"h ago";
+  return Math.floor(s/86400)+"d ago";
+}
+
+function setView(v){
+  ["traces","stats","settings"].forEach(n=>{
+    document.getElementById("view-"+n).classList.toggle("view-hidden", n!==v);
+  });
+  document.querySelectorAll(".nav a").forEach(a=>a.classList.toggle("active", a.dataset.view===v));
+  document.getElementById("view-title").textContent = v.charAt(0).toUpperCase()+v.slice(1);
+  if (v==="stats") loadStats();
+  if (v==="settings") loadSettings();
+}
+document.querySelectorAll(".nav a").forEach(a=>a.onclick=e=>{e.preventDefault();setView(a.dataset.view)});
+
+async function loadTraces(){
+  try{
+    const q = document.getElementById("search").value;
+    const st = document.getElementById("filter-status").value;
+    const params = new URLSearchParams({page, page_size: pageSize});
+    if (q) params.set("q", q);
+    if (st) params.set("status", st);
+    const data = await api("/api/v1/traces?"+params);
+    total = data.total;
+    renderTraces(data.items);
+    document.getElementById("pageinfo").textContent =
+      `page ${page} · ${data.items.length} of ${total}`;
+    document.getElementById("prev").disabled = page<=1;
+    document.getElementById("next").disabled = page*pageSize>=total;
+    renderKpi(data.items);
+  } catch(e){
+    document.getElementById("tbody").innerHTML =
+      `<tr><td colspan="7" class="empty">Error: ${e.message}</td></tr>`;
+  }
+}
+
+function renderTraces(items){
+  if (!items.length){
+    document.getElementById("tbody").innerHTML =
+      '<tr><td colspan="7" class="empty">No traces yet. Instrument an agent and call tracer.export_to(...).</td></tr>';
+    return;
+  }
+  document.getElementById("tbody").innerHTML = items.map(t=>`
+    <tr class="row" onclick="openTrace('${t.trace_id}')">
+      <td><span class="status ${t.status}">${t.status}</span></td>
+      <td><b>${escape(t.name)}</b><div class="mono">${t.trace_id}</div></td>
+      <td>${t.span_count}</td>
+      <td>${fmtNum(t.total_tokens)}</td>
+      <td>${fmtCost(t.cost_usd)}</td>
+      <td>${fmtMs(t.duration_ms)}</td>
+      <td class="mono">${timeAgo(t.start_ts)}</td>
+    </tr>`).join("");
+}
+
+function renderKpi(items){
+  // Approximate KPIs from the current page (cheap, always shows numbers)
+  const tokens = items.reduce((a,b)=>a+(b.total_tokens||0),0);
+  const cost = items.reduce((a,b)=>a+(b.cost_usd||0),0);
+  const errors = items.filter(i=>i.status==="error").length;
+  document.getElementById("kpi").innerHTML = `
+    <div class="card"><div class="k">Total traces</div><div class="v">${fmtNum(total)}</div></div>
+    <div class="card"><div class="k">Tokens (page)</div><div class="v">${fmtNum(tokens)}</div></div>
+    <div class="card"><div class="k">Cost (page)</div><div class="v">${fmtCost(cost)}</div></div>
+    <div class="card"><div class="k">Errors (page)</div><div class="v">${errors}</div></div>`;
+}
+
+async function openTrace(id){
+  document.getElementById("modal").classList.add("show");
+  document.getElementById("m-spans").innerHTML = '<div class="empty">Loading…</div>';
+  const t = await api("/api/v1/traces/"+id);
+  document.getElementById("m-name").textContent = t.name;
+  document.getElementById("m-id").textContent = t.trace_id;
+  document.getElementById("m-cards").innerHTML = `
+    <div class="card"><div class="k">status</div><div class="v">${t.status}</div></div>
+    <div class="card"><div class="k">duration</div><div class="v">${fmtMs(t.duration_ms)}</div></div>
+    <div class="card"><div class="k">spans</div><div class="v">${t.span_count}</div></div>
+    <div class="card"><div class="k">tokens</div><div class="v">${fmtNum(t.total_tokens)}</div></div>
+    <div class="card"><div class="k">cost</div><div class="v">${fmtCost(t.cost_usd)}</div></div>
+    <div class="card"><div class="k">errors</div><div class="v">${t.error_count}</div></div>`;
+  const maxd = Math.max(...t.spans.map(s=>s.duration_ms||0), 1);
+  document.getElementById("m-spans").innerHTML = t.spans.map(s=>{
+    const io = [];
+    if (Object.keys(s.inputs||{}).length) io.push("in  "+escape(JSON.stringify(s.inputs)));
+    if (Object.keys(s.outputs||{}).length) io.push("out "+escape(JSON.stringify(s.outputs)));
+    if (s.error) io.push("ERR " + escape(s.error));
+    const tok = s.prompt_tokens||s.completion_tokens
+      ? ` · ${fmtNum(s.prompt_tokens+s.completion_tokens)} tok · ${fmtCost(s.cost_usd)}` : "";
+    const w = ((s.duration_ms||0)/maxd*100).toFixed(0);
+    return `<div class="span">
+      <div class="row1">
+        <span class="kind ${s.kind}">${s.kind}</span>
+        <span class="name">${escape(s.name)}</span>
+        <span class="ml"><span class="dur">${fmtMs(s.duration_ms)} · ${s.status}${tok}</span></span>
+      </div>
+      <div class="bar" style="width:${w}%"></div>
+      ${io.length ? '<div class="io">'+io.join("\\n")+'</div>' : ''}
+    </div>`;
+  }).join("");
+}
+function closeModal(){document.getElementById("modal").classList.remove("show")}
+function escape(s){return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+
+async function loadStats(){
+  const s = await api("/api/v1/stats?days=14");
+  document.getElementById("kpi-stats").innerHTML = `
+    <div class="card"><div class="k">Traces (14d)</div><div class="v">${fmtNum(s.total_traces)}</div></div>
+    <div class="card"><div class="k">Total tokens</div><div class="v">${fmtNum(s.total_tokens)}</div></div>
+    <div class="card"><div class="k">Total cost</div><div class="v">${fmtCost(s.total_cost_usd)}</div></div>
+    <div class="card"><div class="k">Error rate</div><div class="v">${(s.error_rate*100).toFixed(1)}<small>%</small></div></div>
+    <div class="card"><div class="k">Avg duration</div><div class="v">${fmtMs(s.avg_duration_ms)}</div></div>`;
+  drawCharts(s);
+}
+
+function drawCharts(s){
+  const opts = {responsive:true, plugins:{legend:{display:false}},
+    scales:{x:{ticks:{color:"#a4b0c8"},grid:{color:"#1e2740"}},
+            y:{ticks:{color:"#a4b0c8"},grid:{color:"#1e2740"}}}};
+  if (chartDay) chartDay.destroy();
+  chartDay = new Chart(document.getElementById("chart-day"), {
+    type:"bar",
+    data:{labels: s.traces_per_day.map(d=>d.date),
+          datasets:[{label:"traces", data:s.traces_per_day.map(d=>d.count),
+                     backgroundColor:"rgba(94,194,255,.5)", borderColor:"#5ec2ff", borderWidth:1}]},
+    options: opts,
+  });
+  if (chartModels) chartModels.destroy();
+  chartModels = new Chart(document.getElementById("chart-models"), {
+    type:"bar",
+    data:{labels: s.top_models.map(m=>m.model),
+          datasets:[{label:"cost", data:s.top_models.map(m=>m.cost),
+                     backgroundColor:"rgba(189,147,249,.5)", borderColor:"#bd93f9", borderWidth:1}]},
+    options:{...opts, indexAxis:"y"},
+  });
+}
+
+async function loadSettings(){
+  document.getElementById("api-key").textContent = apiKey || "(not set)";
+  document.getElementById("api-key-2").textContent = apiKey || "your-key";
+  document.getElementById("api-url").textContent = location.origin;
+  try{
+    const p = await api("/api/v1/project");
+    document.getElementById("proj-name").textContent = p.name;
+  } catch{ document.getElementById("proj-name").textContent = "—"; }
+}
+function copyKey(){
+  navigator.clipboard.writeText(apiKey);
+  event.target.textContent = "Copied!";
+  setTimeout(()=>event.target.textContent="Copy", 1200);
+}
+
+document.getElementById("search").addEventListener("input", debounce(()=>{page=1; loadTraces()}, 300));
+document.getElementById("filter-status").addEventListener("change", ()=>{page=1; loadTraces()});
+document.getElementById("prev").onclick = ()=>{if(page>1){page--; loadTraces()}};
+document.getElementById("next").onclick = ()=>{page++; loadTraces()};
+function debounce(fn,ms){let t;return (...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}}
+
+(async function init(){
+  if (!apiKey) await bootstrapKey();
+  await loadTraces();
+  await loadSettings();
+  // Poll for new traces every 5s while on the traces view
+  setInterval(()=>{ if(!document.getElementById("view-traces").classList.contains("view-hidden")) loadTraces(); }, 5000);
+})();
+</script>
+</body>
+</html>
