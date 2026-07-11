@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "agentlens": {
+      "command": "python",
+      "args": ["-m", "agentlens.mcp_server"],
+      "cwd": "e:/ai-learning-portal/mutlitagent/agentlens",
+      "env": {
+        "AGENTLENS_SERVER_URL": "http://localhost:8800",
+        "AGENTLENS_RUNS_DIR": "runs"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "list_local_traces",
+        "get_local_trace",
+        "get_trace_cost_breakdown",
+        "list_server_traces",
+        "get_server_stats"
+      ]
+    }
+  }
+}

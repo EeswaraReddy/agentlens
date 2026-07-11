@@ -39,6 +39,7 @@ langgraph = ["langchain-core"]
 openai-agents = ["openai-agents"]
 otlp = ["opentelemetry-sdk", "opentelemetry-exporter-otlp-proto-grpc"]
 postgres = ["psycopg2-binary"]
+mcp = ["mcp>=1.0"]
 dev = ["pytest", "fastapi", "uvicorn", "sqlalchemy", "httpx", "build", "twine"]
 
 [project.urls]
@@ -49,6 +50,7 @@ Changelog = "https://github.com/EeswaraReddy/agentlens/blob/main/CHANGELOG.md"
 
 [project.scripts]
 agentlens = "agentlens.cli:main"
+agentlens-mcp = "agentlens.mcp_server:main"
 
 [tool.setuptools.packages.find]
 include = ["agentlens*"]
